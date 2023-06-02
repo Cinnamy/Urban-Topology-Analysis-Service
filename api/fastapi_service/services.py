@@ -2,7 +2,7 @@ from database import engine, Base, SessionLocal, database, DATABASE_URL
 from models import City, CityProperty, Point
 from shapely.geometry.point import Point as ShapelyPoint
 from database import *
-from schemas import CityBase, PropertyBase, PointBase, RegionBase, GraphBase
+from schemas import CityBase, PropertyBase, PointBase, RegionBase, GraphBase, StopsBase
 from shapely.geometry.multilinestring import MultiLineString
 from shapely.geometry.linestring import LineString
 from shapely.geometry.polygon import Polygon
@@ -75,6 +75,17 @@ def graph_to_scheme(points, edges, pprop, wprop) -> GraphBase:
                      ways_properties_csv=wprop_str, points_properties_csv=pprop_str,
                      reversed_edges_csv=r_edges_str, reversed_nodes_csv=r_nodes_str)
                     #  reversed_matrix_csv=r_matrix_str)
+
+def get_stops_answer(stops, edges, stops_prop) -> StopsBase:
+    stops_csv_str = list_to_csv_str(stops, ['id', 'longitude', 'latitude'])[0]
+    stops_prop_csv_str = list_to_csv_str(stops_prop, ['id', 'property', 'value'])[0]
+    stops_edges_csv_str = list_to_csv_str(edges, ['id', 'id_route', 'id_src', 'id_dest'])[0]
+    
+    return StopsBase(
+        stops_nodes_csv=stops_csv_str,
+        stops_properties_csv=stops_prop_csv_str,
+        stops_edges_csv=stops_edges_csv_str,
+    )
 
 
 async def property_to_scheme(property : CityProperty) -> PropertyBase:
@@ -480,6 +491,14 @@ async def graph_from_ids(city_id : int, regions_ids : List[int], regions : GeoDa
     if polygon == None:
         return None, None, None, None
     return await graph_from_poly(city_id=city_id, polygon=polygon)
+
+async def stops_graph_from_ids(city_id : int, regions_ids : List[int], regions : GeoDataFrame):
+    polygon = polygons_from_region(regions_ids=regions_ids, regions=regions)
+    if polygon == None:
+        return None, None, None
+    return await stops_graph_from_poly(city_id=city_id, polygon=polygon)
+
+
     
 def point_obj_to_list(db_record) -> List:
     return [db_record.id, db_record.longitude, db_record.latitude]
@@ -492,6 +511,14 @@ def record_obj_to_wprop(record):
 
 def record_obj_to_pprop(record):
     return [record.id_point ,record.property ,record.value]
+
+
+def point_obj_to_list(db_record):
+    return [db_record.id, db_record.longitude, db_record.latitude]
+
+
+def stops_edge_obj_to_list(db_record):
+    return [db_record.id, db_record.id_route, db_record.id_src, db_record.id_dest]
 
 
 async def graph_from_poly(city_id, polygon):
@@ -641,6 +668,32 @@ def filter_by_polygon(polygon, edges, points):
             ways_prop_ids.add(edge[1])
 
     return points_filtred, edges_filtred, ways_prop_ids, points_ids
+
+
+
+def filter_stops_by_polygon(polygon, points, edges):
+    """
+    points ->  [...[id, longitude, latitude], ...]
+    edges  ->  [.. [id_edge, id_route, id_src, id_dest], ... ]
+    """
+    points_ids = set()
+    points_filtred = []
+    edges_filtred = []
+
+    for point in points:
+        lon = point[1]
+        lat = point[2]
+        if polygon.contains(ShapelyPoint(lon, lat)):
+            points_ids.add(point[0])
+            points_filtred.append(point)
+
+    for edge in edges:
+        id_from = edge[2]
+        id_to = edge[3]
+        if (id_from in points_ids) and (id_to in points_ids):
+            edges_filtred.append(edge)
+
+    return points_filtred, edges_filtred, points_ids
 
 
 # nodata = '-'
@@ -974,3 +1027,59 @@ def getRoutesGraph(city_id):
             adjacency_list[route1].remove(route1)
 
     return adjacency_list
+
+
+async def stops_graph_from_poly(city_id, polygon):
+    bbox = polygon.bounds   # min_lon, min_lat, max_lon, max_lat
+
+    conn = engine.connect()
+
+    q = CityAsync.select().where(CityAsync.c.id == city_id)
+    city = await database.fetch_one(q)
+    if city is None or not city.downloaded:
+        return None, None, None
+    
+    query = text(
+        f"""SELECT n.id, n.longitude, n.latitude
+        FROM "Nodes" n
+        JOIN "Stops" s ON s.id_node = n.id 
+        JOIN "RoutesTable" r ON s.id_route = r.id
+        WHERE r.id_city = {city_id}
+        AND (n.longitude BETWEEN {bbox[0]} AND {bbox[2]})
+        AND (n.latitude BETWEEN {bbox[1]} AND {bbox[3]});
+        """
+    )
+    result = await database.fetch_all(query)
+    stops = list(map(point_obj_to_list, result)) # [...[id, longitude, latitude]...]
+
+    query = text(
+        f"""
+        SELECT e.id, e.id_src, e.id_dest, e.id_route
+        FROM EdgesTable as e
+        JOIN Nodes as n ON n.id = e.id_src
+        
+        WHERE (n.longitude BETWEEN {bbox[0]} AND {bbox[2]})
+        AND (n.latitude BETWEEN {bbox[1]} AND {bbox[3]});
+        """
+    )
+    results = conn.execute(query).fetchall()
+
+    stops_edges = list(map(stops_edge_obj_to_list, results))
+
+    points_filtred, edges_filtred, points_prop_ids = filter_stops_by_polygon(polygon, stops, stops_edges)
+
+    ids_points = build_in_query('id_point', points_prop_ids)
+
+    query = text(
+        f"""
+        SELECT id_point, property, value FROM 
+        (SELECT id_point, id_property, value FROM "NodesProperty" WHERE {ids_points}) AS p 
+        JOIN "NodesPropertyTable" ON p.id_property = "NodesPropertyTable".id;
+        """
+    )
+    
+    result = conn.execute(query).fetchall()
+
+    stops_prop = list(map(record_obj_to_pprop, result)) # [...[id.point, property, value]...]
+
+    return points_filtred, edges_filtred, stops_prop
