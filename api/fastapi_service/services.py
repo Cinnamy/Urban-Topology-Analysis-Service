@@ -143,7 +143,6 @@ def add_info_to_db(city_df : DataFrame):
     if (not downloaded) and (os.path.exists(file_path)):
         print("ANDO NOW IM HERE")
         add_graph_to_db(city_id=city_id, file_path=file_path, city_name=city_name)
-        add_stops_and_routes_to_db(city_id=city_id, file_path=file_path)
 
 
 def add_graph_to_db(city_id: int, file_path: str, city_name: str) -> None:
@@ -1056,8 +1055,8 @@ async def stops_graph_from_poly(city_id, polygon):
     query = text(
         f"""
         SELECT e.id, e.id_src, e.id_dest, e.id_route
-        FROM "EdgesTable" as e
-        JOIN "Nodes" as n ON n.id = e.id_src
+        FROM EdgesTable as e
+        JOIN Nodes as n ON n.id = e.id_src
         
         WHERE (n.longitude BETWEEN {bbox[0]} AND {bbox[2]})
         AND (n.latitude BETWEEN {bbox[1]} AND {bbox[3]});

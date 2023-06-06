@@ -138,7 +138,7 @@ async def city_graph_poly(
     return services.graph_to_scheme(points, edges, pprop, wprop)
 
 
-@app.post('/api/city/stops/region/', response_model=StopsBase)
+@app.post('/api/city_v2/stops/region/', response_model=StopsBase)
 @logger.catch(exclude=HTTPException)
 async def stops_graph(
     city_id: int,
@@ -160,13 +160,13 @@ async def stops_graph(
     return services.get_stops_answer(stops, edges, stops_prop)
 
 
-@app.post('/api/city/stops/bbox/{city_id}/', response_model=StopsBase)
+@app.post('/api/city_v2/stops/bbox/{city_id}/', response_model=StopsBase)
 @logger.catch(exclude=HTTPException)
 async def stops_graph_poly(
     city_id: int,
     polygons_as_list:  List[List[List[float]]]
 ):
-    request = f"POST /api/city/stops/bbox/{city_id}/"
+    request = f"POST /api/city_v2/stops/bbox/{city_id}/"
     status_code = 200
     detail = "OK"
 
