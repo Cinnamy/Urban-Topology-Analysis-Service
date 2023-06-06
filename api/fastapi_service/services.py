@@ -2,7 +2,7 @@ from database import engine, Base, SessionLocal, database, DATABASE_URL
 from models import City, CityProperty, Point
 from shapely.geometry.point import Point as ShapelyPoint
 from database import *
-from schemas import CityBase, PropertyBase, PointBase, RegionBase, GraphBase, StopsBase
+from schemas import CityBase, PropertyBase, PointBase, RegionBase, GraphBase, StopsBase, RouteBase
 from shapely.geometry.multilinestring import MultiLineString
 from shapely.geometry.linestring import LineString
 from shapely.geometry.polygon import Polygon
@@ -75,6 +75,17 @@ def graph_to_scheme(points, edges, pprop, wprop) -> GraphBase:
                      ways_properties_csv=wprop_str, points_properties_csv=pprop_str,
                      reversed_edges_csv=r_edges_str, reversed_nodes_csv=r_nodes_str)
                     #  reversed_matrix_csv=r_matrix_str)
+
+def get_routes_answer(routes, routes_edges, routes_prop) -> RouteBase:
+    routes_csv_str = list_to_csv_str(routes, ['id', 'longitude', 'latitude'])[0]
+    routes_prop_csv_str = list_to_csv_str(routes_prop, ['id', 'property', 'value'])[0]
+    routes_edges_csv_str = list_to_csv_str(routes_edges, ['id', 'id_route', 'id_src', 'id_dest'])[0]
+    
+    return RouteBase(
+        routes_nodes_csv=routes_csv_str,
+        routes_properties_csv=routes_prop_csv_str,
+        routes_edges_csv=routes_edges_csv_str
+    )
 
 def get_stops_answer(stops, edges, stops_prop) -> StopsBase:
     stops_csv_str = list_to_csv_str(stops, ['id', 'longitude', 'latitude'])[0]
@@ -492,11 +503,19 @@ async def graph_from_ids(city_id : int, regions_ids : List[int], regions : GeoDa
         return None, None, None, None
     return await graph_from_poly(city_id=city_id, polygon=polygon)
 
+
 async def stops_graph_from_ids(city_id : int, regions_ids : List[int], regions : GeoDataFrame):
     polygon = polygons_from_region(regions_ids=regions_ids, regions=regions)
     if polygon == None:
         return None, None, None
     return await stops_graph_from_poly(city_id=city_id, polygon=polygon)
+
+
+async def routes_graph_from_ids(city_id : int, regions_ids : List[int], regions : GeoDataFrame):
+    polygon = polygons_from_region(regions_ids=regions_ids, regions=regions)
+    if polygon == None:
+        return None, None, None
+    return await routes_graph_from_poly(city_id=city_id, polygon=polygon)
 
 
     
@@ -1083,3 +1102,85 @@ async def stops_graph_from_poly(city_id, polygon):
     stops_prop = list(map(record_obj_to_pprop, result)) # [...[id.point, property, value]...]
 
     return points_filtred, edges_filtred, stops_prop
+
+
+async def routes_graph_from_poly(city_id, polygon):
+    bbox = polygon.bounds   # min_lon, min_lat, max_lon, max_lat
+    conn = engine.connect()
+
+    q = CityAsync.select().where(CityAsync.c.id == city_id)
+    city = await database.fetch_one(q)
+    if city is None or not city.downloaded:
+        return None, None, None
+    
+    # Индексы из региона
+    needRoutes = text(
+        f"""SELECT DISTINCT Stops.id_route
+            FROM Stops
+            JOIN Nodes ON Stops.id_node = Nodes.id
+            JOIN "RoutesTable" rt ON Stops.id_route = rt.id
+            WHERE Nodes.latitude BETWEEN {bbox[0]} AND {bbox[2]}
+            AND Nodes.longitude BETWEEN {bbox[1]} AND {bbox[3]}
+            AND rt.id_city = {city_id}
+        """
+    )
+    results = conn.execute(needRoutes).fetchall()
+
+    routes_ids = set(map(lambda x: x.id_route, results))
+    
+    ids_points = build_in_query('r.id', routes_ids)
+
+    query = text(
+        f"""SELECT p.id_route, p.id_property, p.value
+            FROM "RoutesProperty" p
+            JOIN "RoutesTable" r ON p.id_route = r.id 
+            WHERE {ids_points}
+            AND r.id_city = {city_id};
+        """
+    )
+
+    results = conn.execute(query).fetchall()
+
+    # Список свойств       [...[id.route, property, value]...]
+    routes_prop = list(map(lambda x: [x.id_route, x.id_property, x.value] , results)) 
+
+    # q = select(RoutesTable).where(RoutesTable.c.id_city == city_id)
+    q = text(
+        f"""SELECT DISTINCT Stops.id_route, rt.name, type.route_type
+            FROM Stops
+            JOIN Nodes ON Stops.id_node = Nodes.id
+            JOIN "RoutesTable" rt ON Stops.id_route = rt.id
+            JOIN "Types" type ON rt.id_type = type.id
+            WHERE Nodes.latitude BETWEEN {bbox[0]} AND {bbox[2]}
+            AND Nodes.longitude BETWEEN {bbox[1]} AND {bbox[3]}
+            AND rt.id_city = {city_id}
+        """
+    )
+    results = conn.execute(q).fetchall()
+
+    # Список маршрутов        [ ... , id_route, name, route_type], ... ]
+    routes_list = list(map(lambda x: [x.id_route, x.name, x.route_type] , results))
+
+    stopsPd = pd.read_sql_table("Stops", conn)
+
+    adjacency_list = defaultdict(set)
+
+    # ключами являются идентификаторы маршрутов, а значениями - множества идентификаторов маршрутов
+    stop_routes = stopsPd.groupby("id_node")["id_route"].apply(set).to_dict()
+
+    adjacency_list = defaultdict(set)
+    for ost, routes in stop_routes.items():
+        for route1 in routes:
+            if route1 in routes_ids:
+                for route2 in routes:
+                    if route2 in routes_ids:
+                        adjacency_list[route1].add(route2)
+                adjacency_list[route1].remove(route1)
+
+    # Список рёбер
+    routes_edges_list = []        # [...[id.route, id.route]...]
+    for key, value in adjacency_list.items():
+        for idx in value:
+            routes_edges_list.append([key, idx])
+
+    return routes_list, routes_edges_list, routes_prop
