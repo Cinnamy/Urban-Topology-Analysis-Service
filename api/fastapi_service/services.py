@@ -77,9 +77,9 @@ def graph_to_scheme(points, edges, pprop, wprop) -> GraphBase:
                     #  reversed_matrix_csv=r_matrix_str)
 
 def get_routes_answer(routes, routes_edges, routes_prop) -> RouteBase:
-    routes_csv_str = list_to_csv_str(routes, ['id', 'longitude', 'latitude'])[0]
+    routes_csv_str = list_to_csv_str(routes, ['id', 'name', 'route_type'])[0]
     routes_prop_csv_str = list_to_csv_str(routes_prop, ['id', 'property', 'value'])[0]
-    routes_edges_csv_str = list_to_csv_str(routes_edges, ['id', 'id_route', 'id_src', 'id_dest'])[0]
+    routes_edges_csv_str = list_to_csv_str(routes_edges, ['id_src', 'id_dest'])[0]
     
     return RouteBase(
         routes_nodes_csv=routes_csv_str,

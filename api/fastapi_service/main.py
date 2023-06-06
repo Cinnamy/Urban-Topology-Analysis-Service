@@ -138,6 +138,11 @@ async def city_graph_poly(
     return services.graph_to_scheme(points, edges, pprop, wprop)
 
 
+# --------------------------------------------------------------------------
+# stops
+# --------------------------------------------------------------------------
+
+
 @app.post('/api/city_v2/stops/region/', response_model=StopsBase)
 @logger.catch(exclude=HTTPException)
 async def stops_graph(
@@ -182,6 +187,11 @@ async def stops_graph_poly(
 
     logger.info(f"{request} {status_code} {detail}")
     return services.get_stops_answer(stops, edges, stops_prop)
+
+
+# --------------------------------------------------------------------------
+# routes
+# --------------------------------------------------------------------------
 
 
 @app.post('/api/city_v3/routes/region/', response_model=RouteBase)
