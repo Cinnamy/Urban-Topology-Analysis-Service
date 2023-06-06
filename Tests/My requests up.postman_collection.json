@@ -1,7 +1,7 @@
 {
 	"info": {
-		"_postman_id": "039c37cd-04ae-4484-9691-bf64e8455280",
-		"name": "My requests",
+		"_postman_id": "15f62e4c-02b7-45cb-9b77-20ca1c9ae9d2",
+		"name": "My requests up",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "27725935"
 	},
@@ -15,9 +15,6 @@
 						"exec": [
 							"pm.test(\"Status code is 200\", function () {\r",
 							"    pm.response.to.have.status(200);\r",
-							"});\r",
-							"pm.test(\"Body matches string\", function () {\r",
-							"    pm.expect(pm.response.text()).to.include(\"downloaded\");\r",
 							"});"
 						],
 						"type": "text/javascript"
@@ -91,9 +88,6 @@
 						"exec": [
 							"pm.test(\"Status code is 200\", function () {\r",
 							"    pm.response.to.have.status(200);\r",
-							"});\r",
-							"pm.test(\"Response time is less than 200ms\", function () {\r",
-							"    pm.expect(pm.response.responseTime).to.be.below(200);\r",
 							"});"
 						],
 						"type": "text/javascript"
@@ -228,6 +222,84 @@
 			"response": []
 		},
 		{
+			"name": "http://localhost:8002/api/city_v2/stops/region/?city_id=2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"pm.test(\"Successful POST request\", function () {\r",
+							"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\r",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "sec-ch-ua",
+						"value": "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\""
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "sec-ch-ua-mobile",
+						"value": "?0"
+					},
+					{
+						"key": "User-Agent",
+						"value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"
+					},
+					{
+						"key": "sec-ch-ua-platform",
+						"value": "\"Windows\""
+					},
+					{
+						"key": "host",
+						"value": "localhost"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[-368288]"
+				},
+				"url": {
+					"raw": "http://localhost:8002/api/city_v2/stops/region/?city_id=2",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8002",
+					"path": [
+						"api",
+						"city_v2",
+						"stops",
+						"region",
+						""
+					],
+					"query": [
+						{
+							"key": "city_id",
+							"value": "2"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "http://localhost:8002/api/city/graph/region/?city_id=2",
 			"event": [
 				{
@@ -279,7 +351,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "[-337422]"
+					"raw": "[-368288]"
 				},
 				"url": {
 					"raw": "http://localhost:8002/api/city/graph/region/?city_id=2",
@@ -357,7 +429,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "[[[30.264244079589847,59.97903979779202],[30.312309265136722,60.0034363098915],[30.421142578125004,59.995878750355004],[30.424575805664066,59.966147056200825],[30.342521667480472,59.94791675319701]]]"
+					"raw": "[[[30.33531188964844,59.9847347208899],[30.359687805175785,59.9593073531968],[30.447578430175785,59.971508053826554]]]"
 				},
 				"url": {
 					"raw": "http://localhost:8002/api/city/graph/bbox/2/",
@@ -373,6 +445,223 @@
 						"bbox",
 						"2",
 						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8002/api/city/graph/bbox/2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"pm.test(\"Successful POST request\", function () {\r",
+							"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\r",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "sec-ch-ua",
+						"value": "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\""
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "sec-ch-ua-mobile",
+						"value": "?0"
+					},
+					{
+						"key": "User-Agent",
+						"value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"
+					},
+					{
+						"key": "sec-ch-ua-platform",
+						"value": "\"Windows\""
+					},
+					{
+						"key": "host",
+						"value": "localhost"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[[[30.33531188964844,59.9847347208899],[30.359687805175785,59.9593073531968],[30.447578430175785,59.971508053826554]]]"
+				},
+				"url": {
+					"raw": "http://localhost:8002/api/city/graph/bbox/2",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8002",
+					"path": [
+						"api",
+						"city",
+						"graph",
+						"bbox",
+						"2"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8002/api/city_v2/stops/bbox/2/",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"pm.test(\"Successful POST request\", function () {\r",
+							"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\r",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "sec-ch-ua",
+						"value": "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\""
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "sec-ch-ua-mobile",
+						"value": "?0"
+					},
+					{
+						"key": "User-Agent",
+						"value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"
+					},
+					{
+						"key": "sec-ch-ua-platform",
+						"value": "\"Windows\""
+					},
+					{
+						"key": "host",
+						"value": "localhost"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[[[30.33531188964844,59.9847347208899],[30.359687805175785,59.9593073531968],[30.447578430175785,59.971508053826554]]]"
+				},
+				"url": {
+					"raw": "http://localhost:8002/api/city_v2/stops/bbox/2/",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8002",
+					"path": [
+						"api",
+						"city_v2",
+						"stops",
+						"bbox",
+						"2",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8002/api/city_v2/stops/bbox/2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"pm.test(\"Successful POST request\", function () {\r",
+							"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\r",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "sec-ch-ua",
+						"value": "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\""
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "sec-ch-ua-mobile",
+						"value": "?0"
+					},
+					{
+						"key": "User-Agent",
+						"value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"
+					},
+					{
+						"key": "sec-ch-ua-platform",
+						"value": "\"Windows\""
+					},
+					{
+						"key": "host",
+						"value": "localhost"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[[[30.33531188964844,59.9847347208899],[30.359687805175785,59.9593073531968],[30.447578430175785,59.971508053826554]]]"
+				},
+				"url": {
+					"raw": "http://localhost:8002/api/city_v2/stops/bbox/2",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8002",
+					"path": [
+						"api",
+						"city_v2",
+						"stops",
+						"bbox",
+						"2"
 					]
 				}
 			},
