@@ -143,6 +143,7 @@ def add_info_to_db(city_df : DataFrame):
     if (not downloaded) and (os.path.exists(file_path)):
         print("ANDO NOW IM HERE")
         add_graph_to_db(city_id=city_id, file_path=file_path, city_name=city_name)
+        add_stops_and_routes_to_db(city_id=city_id, file_path=file_path)
 
 
 def add_graph_to_db(city_id: int, file_path: str, city_name: str) -> None:
