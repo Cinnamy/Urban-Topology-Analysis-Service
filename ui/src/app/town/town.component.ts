@@ -2,11 +2,12 @@ import {ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild} 
 import { ActivatedRoute, Router } from '@angular/router';
 import { Region, Town, _distBounds } from '../interfaces/town';
 import { FileService } from '../services/file.service';
-import { csv_result, TownService } from '../services/town.service';
+import { csv_result,stops_result, TownService } from '../services/town.service';
 import { GraphDataSrvice, GraphData, INode, Edge } from '../services/graph-data.service';
 import { saveText } from '../graph/saveAsPNG';  
 
 import * as L from 'leaflet'; //* - все
+import { tap } from 'rxjs';
 
 enum sections{
   map = 'map',
@@ -31,7 +32,7 @@ export class TownComponent implements OnInit, OnDestroy{
   town?: Town;
   RgraphData?: GraphData;
   LgraphData?: GraphData;
-
+  Routes_graph?: GraphData;
   // currentCsv?: csv_result;
 
   graphName = '';
@@ -110,7 +111,8 @@ export class TownComponent implements OnInit, OnDestroy{
     if(ev.regionId){
       this.loading = true;
       this.cdRef.detectChanges();
-      this.townService.getGraphFromId(this.id, ev.regionId).subscribe(this.graphSubscriber)
+      this.townService.getGraphFromId(this.id, ev.regionId).subscribe(this.graphSubscriber);
+      this.townService.getStopsFromId(this.id, ev.regionId).subscribe(this.routesSubscriber)
       return;
     }
     if(ev.polygon){
@@ -118,7 +120,8 @@ export class TownComponent implements OnInit, OnDestroy{
       const body: [number, number][] = nodes.map(node => [node.lng, node.lat]);
       this.loading = true;
       this.cdRef.detectChanges();
-      this.townService.getGraphFromBbox(this.id, body).subscribe(this.graphSubscriber);
+      this.townService.getGraphFromBbox(this.id, body).pipe(tap((graphFromBox) => console.log({graphFromBox}))).subscribe(this.graphSubscriber);
+      this.townService.getStopsFromBbox(this.id, body).subscribe(this.routesSubscriber)
       return;
     }
   }
@@ -131,6 +134,13 @@ export class TownComponent implements OnInit, OnDestroy{
 
     this.getRgraph(res.points_csv, res.edges_csv);
     this.getLgraph(res.reversed_nodes_csv, res.reversed_edges_csv);
+    this.loading = false;
+    this.section = sections.graph;
+    this.cdRef.detectChanges();
+  }
+
+  routesSubscriber = (res: stops_result) => {
+    this.getRoutes(res.stops_nodes_csv, res.stops_edges_csv);
     this.loading = false;
     this.section = sections.graph;
     this.cdRef.detectChanges();
@@ -154,6 +164,43 @@ export class TownComponent implements OnInit, OnDestroy{
         saveText('points_properties.csv', this.pointPropsCsv, 'text/csv');
       if(this.wayPropsCsv) 
         saveText('ways_properties.csv', this.wayPropsCsv, 'text/csv');
+    }
+  }
+
+  getRoutes(nodes_str: string, edges_str: string){
+    const nodes: { [key: string]: INode } = {};
+    const edges: { [key: string]: Edge } = {};
+
+    const node_lines = nodes_str.split('\n')
+    node_lines.slice(1).forEach((line, index) => {
+      const [id, lon, lat] = line.split(',');
+      // const id_way = line.split(',"')[0];
+
+      // const name = names.find(n => n.id == id_way)?.name;
+
+      nodes[Number(id)] = {
+        lon: Number(lon)|| 0,
+        lat: Number(lat) || 0,
+        way_id: Number(id),
+        name: id
+      }
+    })
+
+    const edge_lines = edges_str.split('\n')
+    edge_lines.slice(1).forEach((line, index) => {
+      const [id, route, src, dest] = line.split(',');
+      if(src && nodes[Number(src)] && nodes[Number(dest)]){
+        edges[index] = {
+          from: src,
+          to: dest,
+          id: id
+        }
+      }
+    })
+
+    this.Routes_graph = {
+      nodes: nodes,
+      edges: edges,
     }
   }
 

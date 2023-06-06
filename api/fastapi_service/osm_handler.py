@@ -1,4 +1,5 @@
 from typing import Tuple
+from collections import defaultdict
 import osmium as o
 import traceback
 
@@ -51,6 +52,62 @@ class HighwayNodesHandler(o.SimpleHandler):
             for k, v in dct.items():
                 self.nodes_tags[n.id][k] = v
             
+# --------------------------------------------------------------------
+# Добавлены обработчики, которые получают необходимую информацию об
+# остановках и маршрутах из .osm.pbf файла
+# --------------------------------------------------------------------
+
+class RoutesHandler(o.SimpleHandler):
+    def __init__(self):
+        super(RoutesHandler, self).__init__()
+        self.routes_data = {}
+        self.used_stops_ids = defaultdict(defaultdict)
+
+
+    def relation(self, r):
+        if "route" in r.tags and (
+            r.tags['route'] == 'bus' or 
+            r.tags['route'] == 'trolleybus' or
+            r.tags['route'] == 'tram' or
+            r.tags['route'] == 'subway'
+        ):
+            members = []
+            for member in r.members:
+                if member.type == 'n':
+                    if 'route_id' not in self.used_stops_ids[int(member.ref)].keys():
+                        self.used_stops_ids[int(member.ref)]['route_id'] = []
+                    self.used_stops_ids[int(member.ref)]['route_id'].append(r.id)
+
+                    members.append(member.ref)
+                
+            self.routes_data[r.id] = {tag.k : tag.v if tag.v else "noValue" for tag in r.tags}
+
+            self.routes_data[r.id]["stops"] = members
+            # self.routes_data[r.id] = {
+            #     "stops": members,
+            #     "name": r.tags.get("colour") if r.tags['route'] == 'subway' else r.tags.get("ref", "none"),
+            #     "type": r.tags.get("route"),
+            # }
+
+class StopsHandler(o.SimpleHandler):
+    def __init__(self, used_stops_ids):
+        super(StopsHandler, self).__init__()
+        self.stops_data = used_stops_ids
+
+
+    def node(self, n):
+        if n.id in self.stops_data.keys():  
+            self.stops_data[n.id]['latitude'] = n.location.lat
+            self.stops_data[n.id]['longitude'] = n.location.lon
+            self.stops_data[n.id]['name'] = n.tags.get("name", "noName")
+
+            dct = {tag.k : tag.v for tag in n.tags}
+            if len(dct) == 0:
+                return
+    
+            for k, v in dct.items():
+                self.stops_data[n.id][k] = v
+
 
 def parse_osm(osm_file_path) -> Tuple[dict, dict]:
     ways = HighwayWaysHandler()
@@ -66,3 +123,19 @@ def parse_osm(osm_file_path) -> Tuple[dict, dict]:
         pass
 
     return ways.ways_tags, nodes.nodes_tags
+
+
+def parse_stops(file_path) -> Tuple[dict, dict]:
+    routes = RoutesHandler()
+    try:
+        routes.apply_file(file_path)
+    except RuntimeError:
+        pass
+
+    stops = StopsHandler(routes.used_stops_ids)
+    try:
+        stops.apply_file(file_path)
+    except RuntimeError:
+        pass
+
+    return routes.routes_data, stops.stops_data

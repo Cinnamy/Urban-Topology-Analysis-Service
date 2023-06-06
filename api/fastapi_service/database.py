@@ -34,7 +34,7 @@ CityAsync = Table(
 PropertyAsync = Table(
     "Properties",
     metadata,
-    Column("id", Integer, primary_key=True, nullable=False, autoincrement=True),
+    Column("id", BigInteger, primary_key=True, nullable=False, autoincrement=True),
     Column("property", String(50), nullable=False)
 )
 
@@ -42,7 +42,7 @@ PropertyAsync = Table(
 CityPropertyAsync = Table(
     "CityProperties",
     metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True, nullable=True),
+    Column("id", BigInteger, primary_key=True, autoincrement=True, nullable=True),
     Column("c_latitude", Float, nullable=True),
     Column("c_longitude", Float),
     Column("id_district", Integer),
@@ -72,7 +72,7 @@ WayAsync = Table(
 WayPropertyAsync = Table(
     "WayProperties",
     metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True, nullable=False),
+    Column("id", BigInteger, primary_key=True, autoincrement=True, nullable=False),
     Column("id_way", BigInteger, ForeignKey("Ways.id"),onupdate="CASCADE", nullable=False),
     Column("id_property", BigInteger, ForeignKey("Properties.id"), nullable=False),
     Column("value", String, nullable=False),
@@ -82,7 +82,7 @@ WayPropertyAsync = Table(
 EdgesAsync = Table(
     "Edges",
     metadata,
-    Column("id",  Integer, primary_key=True, autoincrement=True, nullable=False),
+    Column("id",  BigInteger, primary_key=True, autoincrement=True, nullable=False),
     Column("id_way", BigInteger, ForeignKey("Ways.id"), nullable=False,onupdate="CASCADE"),
     Column("id_src", BigInteger, ForeignKey("Points.id"), nullable= False,onupdate="CASCADE"),
     Column("id_dist", BigInteger, ForeignKey("Points.id"), nullable=False,onupdate="CASCADE")
@@ -91,12 +91,90 @@ EdgesAsync = Table(
 PointPropertyAsync = Table(
     "PointProperties",
     metadata,
-    Column("id",Integer, primary_key=True, autoincrement=True, nullable=False),
+    Column("id",BigInteger, primary_key=True, autoincrement=True, nullable=False),
     Column("id_point", BigInteger, ForeignKey("Points.id"), onupdate="CASCADE", nullable=False),
     Column("id_property", Integer, ForeignKey("Properties.id"), nullable=False),
     Column("value", String, nullable=False)
 )
 
+# --------------------------------------------------------------------
+# Добавлены таблицы для хранения информации об остановках и маршрутах
+# --------------------------------------------------------------------
+
+# 1 Таблица типов маршрутов (автобус, троллейбус, ...)
+RoutesTypes = Table(
+    "Types",
+    metadata,
+    Column("id", BigInteger, primary_key=True, autoincrement=True),
+    Column("route_type", VARCHAR(30))
+)
+
+# 2 Таблица маршрутов
+RoutesTable= Table(
+    "RoutesTable",
+    metadata,
+    Column("id", BigInteger, primary_key=True, autoincrement=True),
+    Column("name", String),
+    Column("id_type", BigInteger, ForeignKey("Types.id")),
+    Column("id_city", BigInteger, ForeignKey("Cities.id"))
+)
+
+# 3 Таблица свойств маршрутов
+RoutesProperty = Table(
+    "RoutesProperty",
+    metadata,
+    Column("id", BigInteger, primary_key=True, autoincrement=True),
+    Column("id_route", BigInteger, ForeignKey("RoutesTable.id")),
+    Column("id_property", BigInteger, ForeignKey("NodesPropertyTable.id")),
+    Column("value", String),
+)
+
+# 4 Таблица остановок
+StopsTable = Table(
+    "Stops",
+    metadata,
+    Column("id", BigInteger, primary_key=True, autoincrement=True),
+    Column("name", String),
+    Column("id_route", BigInteger, ForeignKey("RoutesTable.id")),
+    Column("id_node", BigInteger, ForeignKey("Nodes.id")),
+)
+
+# 5 Таблица координат остановок
+NodesTable = Table(
+    "Nodes",
+    metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("longitude", Float),
+    Column("latitude", Float),
+)
+
+# 6 Таблица рёбер (id_остановки -> id_остановки)
+EdgesTable = Table(
+    "EdgesTable",
+    metadata,
+    Column("id",  BigInteger, primary_key=True, autoincrement=True),
+    Column("id_src", BigInteger, ForeignKey("Nodes.id")),
+    Column("id_dest", BigInteger, ForeignKey("Nodes.id")),
+    Column("id_route", BigInteger, ForeignKey("RoutesTable.id"))
+)
+
+# 7 Таблица свойств остановок
+NodesProperty = Table(
+    "NodesProperty",
+    metadata,
+    Column("id",BigInteger, primary_key=True, autoincrement=True),
+    Column("id_point", BigInteger, ForeignKey("Nodes.id")),
+    Column("id_property", BigInteger, ForeignKey("NodesPropertyTable.id")),
+    Column("value", String)
+)
+
+# 8 Таблица id_свойств остановок и маршрутов
+NodesPropertyTable = Table(
+    "NodesPropertyTable",
+    metadata,
+    Column("id", BigInteger, primary_key=True, autoincrement=True),
+    Column("property", String(50))
+)
 
 engine = create_engine(DATABASE_URL, echo=True)
 

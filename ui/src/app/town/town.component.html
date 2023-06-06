@@ -18,11 +18,17 @@
         <a name="roads"></a>
         <app-roads *ngIf="RgraphData" [graphData]="RgraphData" [loading]="loading" (downloadRgraph)="handleDownload('r')"></app-roads>
     </div>
+    <div class="graphWrapper">
+        <a name="routes"></a>
+        <app-graph *ngIf="Routes_graph" [graphData]="Routes_graph" [name]="graphName" [loading]="loading" (downloadLgraph)="handleDownload('l')"></app-graph>
+    </div>
+
 
     <div class="nav">
         <button title="Map" [ngClass]="{'active': section == 'map'}" (click)="section = 'map'"></button>
         <button title="Graph" [ngClass]="{'active': section == 'graph'}" (click)="section = 'graph'" [disabled]="!LgraphData"></button>
         <button title="Roads" [ngClass]="{'active': section == 'roads'}" (click)="section = 'roads'" [disabled]="!RgraphData"></button>
+        <button title="Routes" [ngClass]="{'active': section == 'routes'}" (click)="section = 'routes'" [disabled]="!Routes_graph"></button>
     </div>
 </div>
 

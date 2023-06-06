@@ -36,6 +36,13 @@ class GraphBase(BaseModel):
     # reversed_matrix_csv : str
 
 
+class StopsBase(BaseModel):
+    stops_properties_csv : str
+    stops_edges_csv : str
+    stops_nodes_csv : str
 
-    
 
+class RouteBase(BaseModel):
+    routes_properties_csv : str
+    routes_edges_csv : str
+    routes_nodes_csv : str

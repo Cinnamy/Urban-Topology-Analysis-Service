@@ -2,16 +2,18 @@ from database import engine, Base, SessionLocal, database, DATABASE_URL
 from models import City, CityProperty, Point
 from shapely.geometry.point import Point as ShapelyPoint
 from database import *
-from schemas import CityBase, PropertyBase, PointBase, RegionBase, GraphBase
+from schemas import CityBase, PropertyBase, PointBase, RegionBase, GraphBase, StopsBase
 from shapely.geometry.multilinestring import MultiLineString
 from shapely.geometry.linestring import LineString
 from shapely.geometry.polygon import Polygon
 from shapely.ops import unary_union
 from geopandas.geodataframe import GeoDataFrame
 from pandas.core.frame import DataFrame
-from osm_handler import parse_osm
+from osm_handler import parse_osm, parse_stops
 from typing import List, Iterable, Union, TYPE_CHECKING
-from sqlalchemy import update, text
+from sqlalchemy import update, text, select
+from collections import defaultdict
+
 
 import pandas as pd
 import osmnx as ox
@@ -73,6 +75,17 @@ def graph_to_scheme(points, edges, pprop, wprop) -> GraphBase:
                      ways_properties_csv=wprop_str, points_properties_csv=pprop_str,
                      reversed_edges_csv=r_edges_str, reversed_nodes_csv=r_nodes_str)
                     #  reversed_matrix_csv=r_matrix_str)
+
+def get_stops_answer(stops, edges, stops_prop) -> StopsBase:
+    stops_csv_str = list_to_csv_str(stops, ['id', 'longitude', 'latitude'])[0]
+    stops_prop_csv_str = list_to_csv_str(stops_prop, ['id', 'property', 'value'])[0]
+    stops_edges_csv_str = list_to_csv_str(edges, ['id', 'id_route', 'id_src', 'id_dest'])[0]
+    
+    return StopsBase(
+        stops_nodes_csv=stops_csv_str,
+        stops_properties_csv=stops_prop_csv_str,
+        stops_edges_csv=stops_edges_csv_str,
+    )
 
 
 async def property_to_scheme(property : CityProperty) -> PropertyBase:
@@ -478,6 +491,14 @@ async def graph_from_ids(city_id : int, regions_ids : List[int], regions : GeoDa
     if polygon == None:
         return None, None, None, None
     return await graph_from_poly(city_id=city_id, polygon=polygon)
+
+async def stops_graph_from_ids(city_id : int, regions_ids : List[int], regions : GeoDataFrame):
+    polygon = polygons_from_region(regions_ids=regions_ids, regions=regions)
+    if polygon == None:
+        return None, None, None
+    return await stops_graph_from_poly(city_id=city_id, polygon=polygon)
+
+
     
 def point_obj_to_list(db_record) -> List:
     return [db_record.id, db_record.longitude, db_record.latitude]
@@ -490,6 +511,14 @@ def record_obj_to_wprop(record):
 
 def record_obj_to_pprop(record):
     return [record.id_point ,record.property ,record.value]
+
+
+def point_obj_to_list(db_record):
+    return [db_record.id, db_record.longitude, db_record.latitude]
+
+
+def stops_edge_obj_to_list(db_record):
+    return [db_record.id, db_record.id_route, db_record.id_src, db_record.id_dest]
 
 
 async def graph_from_poly(city_id, polygon):
@@ -639,6 +668,32 @@ def filter_by_polygon(polygon, edges, points):
             ways_prop_ids.add(edge[1])
 
     return points_filtred, edges_filtred, ways_prop_ids, points_ids
+
+
+
+def filter_stops_by_polygon(polygon, points, edges):
+    """
+    points ->  [...[id, longitude, latitude], ...]
+    edges  ->  [.. [id_edge, id_route, id_src, id_dest], ... ]
+    """
+    points_ids = set()
+    points_filtred = []
+    edges_filtred = []
+
+    for point in points:
+        lon = point[1]
+        lat = point[2]
+        if polygon.contains(ShapelyPoint(lon, lat)):
+            points_ids.add(point[0])
+            points_filtred.append(point)
+
+    for edge in edges:
+        id_from = edge[2]
+        id_to = edge[3]
+        if (id_from in points_ids) and (id_to in points_ids):
+            edges_filtred.append(edge)
+
+    return points_filtred, edges_filtred, points_ids
 
 
 # nodata = '-'
@@ -794,3 +849,237 @@ def get_reversed_graph(graph: DataFrame, way_column: str):
     edges_df = df_connections[["src_index", "dest_index"]].drop_duplicates().reset_index(drop=True)
     return edges_df, nodes_df
 
+
+def addRoadTypes():
+    conn = engine.connect()
+    routeTypesList = [
+        {"id" : 1, "route_type" : 'bus'},
+        {"id" : 2, "route_type" : 'trolleybus'},
+        {"id" : 3, "route_type" : 'tram'},
+        {"id" : 4, "route_type" : 'subway'}
+    ]
+
+    try:
+        conn.execute(RoutesTypes.insert(), routeTypesList)
+    except:
+        pass
+
+    conn.close()
+
+
+def add_stops_and_routes_to_db(city_id : int, file_path : str):
+    routes, stops = parse_stops(file_path)
+    addRoadTypes()
+
+    conn = engine.connect()
+
+    routesList = []
+    stopsList = []
+    edgesList = []
+    nodesList = []
+
+    node_property_list = []
+    route_property_list = []
+    property_dict = {}
+    routeTypesDict = {}
+    
+    res = conn.execute(select(RoutesTypes))
+    for row in res:
+        routeTypesDict[row.route_type] = row.id
+
+    res = conn.execute(select(NodesPropertyTable))
+    for row in res:
+        property_dict[row.property] = row.id
+
+    stop_names = {}
+
+    for stop_id in stops.keys():
+        stop_names[stop_id] = stops[stop_id].get("name")
+        nodesList.append({
+            "id"  : stop_id, 
+            "longitude" : stops[stop_id].get("longitude"),
+            "latitude" : stops[stop_id].get("latitude")
+        })
+        
+        for key2 in stops[stop_id].keys():
+            if key2 == "longitude" or key2 == "latitude":
+                continue
+            prop_id = None
+            if property_dict.get(key2) is not None:
+                prop_id = property_dict.get(key2)
+            else:
+                try:
+                    query = NodesPropertyTable.insert().values(property=f"{key2}")
+                    prop_id = conn.execute(query).inserted_primary_key[0]
+                    prop_id = int(prop_id)
+                    property_dict.update({key2: prop_id})
+                except:
+                    pass
+            if prop_id!= None:
+
+                if key2 == 'route_id':
+                    for RouteId in stops[stop_id][key2]:
+                        node_property_list.append({"id_point": f"{stop_id}",
+                                                   "id_property": f"{prop_id}", 
+                                                   "value": f"{RouteId}"})
+                else:     
+                    node_property_list.append({"id_point": f"{stop_id}",
+                                               "id_property": f"{prop_id}", 
+                                               "value": f"{stops[stop_id][key2]}"})
+
+    for route_id in routes.keys():
+        # print("route_id =", route_id, routes[route_id].get("name"), routes[route_id].get("type"))
+        routesList.append({
+            "id" : route_id,
+            "id_city" : city_id,
+            "name" : routes[route_id].get("name"),
+            "id_type" : routeTypesDict[routes[route_id].get("route")]
+            # "id_type" : select(RoutesTypes.c.id).where(RoutesTypes.c.route_type == routeTypesDict[routes[route_id].get("type")])
+        })
+
+        countStops = len(routes[route_id].get("stops"))
+        for j in range(0, countStops):
+            id_stop_j = routes[route_id].get("stops")[j]
+
+            if j != countStops - 1:
+                edgesList.append({
+                    "id_src" : id_stop_j, 
+                    "id_dest": routes[route_id].get("stops")[j + 1],
+                    "id_route":  route_id
+                })
+            stopsList.append({
+                "id_route": route_id,
+                "id_node" : id_stop_j,
+                "name" : stop_names[id_stop_j]
+            })
+        for key2 in routes[route_id].keys():
+            if key2 == "stops":
+                continue
+            prop_id = None
+            if property_dict.get(key2) is not None:
+                prop_id = property_dict.get(key2)
+            else:
+                try:
+                    query = NodesPropertyTable.insert().values(property=f"{key2}")
+                    prop_id = conn.execute(query).inserted_primary_key[0]
+                    prop_id = int(prop_id)
+                    property_dict.update({key2: prop_id})
+                except:
+                    pass
+            if prop_id != None:
+                route_property_list.append({"id_route": f'{route_id}',
+                                            "id_property": f'{prop_id}',
+                                            "value":  f'{routes[route_id][key2]}'})
+                
+
+    try:
+        conn.execute(NodesTable.insert(), nodesList)
+    except:
+        pass
+    try:
+        conn.execute(NodesProperty.insert(), node_property_list)
+    except:
+        pass
+    try:
+        conn.execute(RoutesProperty.insert(), route_property_list)
+    except:
+        pass
+    try:
+        conn.execute(RoutesTable.insert(), routesList)
+    except:
+        pass
+    try:
+        conn.execute(StopsTable.insert(), stopsList)
+    except:
+        pass
+    try:
+        conn.execute(EdgesTable.insert(), edgesList)
+    except:
+        pass
+
+    for container in [routes, stops, stopsList, edgesList, nodesList, stop_names, route_property_list, node_property_list]:
+        container.clear()
+
+    conn.close()
+
+
+def getRoutesGraph(city_id):
+    conn = engine.connect()
+
+    q = select(RoutesTable).where(RoutesTable.c.id_city == city_id)
+    
+    routesPd = pd.read_sql_query(q, conn)
+    routesPd = routesPd.rename(columns={'id': 'id_route'})
+    stopsPd = pd.read_sql_table("Stops", conn)
+
+    merged_df = routesPd.merge(stopsPd, on="id_route")
+
+    adjacency_list = defaultdict(set)
+
+    # ключами являются идентификаторы маршрутов, а значениями - множества идентификаторов маршрутов
+    stop_routes = stopsPd.groupby("id_node")["id_route"].apply(set).to_dict()
+
+    adjacency_list = defaultdict(set)
+    for ost, routes in stop_routes.items():
+        for route1 in routes:
+            for route2 in routes:
+                adjacency_list[route1].add(route2)
+            adjacency_list[route1].remove(route1)
+
+    return adjacency_list
+
+
+async def stops_graph_from_poly(city_id, polygon):
+    bbox = polygon.bounds   # min_lon, min_lat, max_lon, max_lat
+
+    conn = engine.connect()
+
+    q = CityAsync.select().where(CityAsync.c.id == city_id)
+    city = await database.fetch_one(q)
+    if city is None or not city.downloaded:
+        return None, None, None
+    
+    query = text(
+        f"""SELECT n.id, n.longitude, n.latitude
+        FROM "Nodes" n
+        JOIN "Stops" s ON s.id_node = n.id 
+        JOIN "RoutesTable" r ON s.id_route = r.id
+        WHERE r.id_city = {city_id}
+        AND (n.longitude BETWEEN {bbox[0]} AND {bbox[2]})
+        AND (n.latitude BETWEEN {bbox[1]} AND {bbox[3]});
+        """
+    )
+    result = await database.fetch_all(query)
+    stops = list(map(point_obj_to_list, result)) # [...[id, longitude, latitude]...]
+
+    query = text(
+        f"""
+        SELECT e.id, e.id_src, e.id_dest, e.id_route
+        FROM EdgesTable as e
+        JOIN Nodes as n ON n.id = e.id_src
+        
+        WHERE (n.longitude BETWEEN {bbox[0]} AND {bbox[2]})
+        AND (n.latitude BETWEEN {bbox[1]} AND {bbox[3]});
+        """
+    )
+    results = conn.execute(query).fetchall()
+
+    stops_edges = list(map(stops_edge_obj_to_list, results))
+
+    points_filtred, edges_filtred, points_prop_ids = filter_stops_by_polygon(polygon, stops, stops_edges)
+
+    ids_points = build_in_query('id_point', points_prop_ids)
+
+    query = text(
+        f"""
+        SELECT id_point, property, value FROM 
+        (SELECT id_point, id_property, value FROM "NodesProperty" WHERE {ids_points}) AS p 
+        JOIN "NodesPropertyTable" ON p.id_property = "NodesPropertyTable".id;
+        """
+    )
+    
+    result = conn.execute(query).fetchall()
+
+    stops_prop = list(map(record_obj_to_pprop, result)) # [...[id.point, property, value]...]
+
+    return points_filtred, edges_filtred, stops_prop
