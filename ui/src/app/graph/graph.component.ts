@@ -43,6 +43,7 @@ export class GraphComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    console.log({graph: this.graphData});
   }
 
   ngOnDestroy(): void {
