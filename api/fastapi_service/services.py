@@ -1055,8 +1055,8 @@ async def stops_graph_from_poly(city_id, polygon):
     query = text(
         f"""
         SELECT e.id, e.id_src, e.id_dest, e.id_route
-        FROM EdgesTable as e
-        JOIN Nodes as n ON n.id = e.id_src
+        FROM "EdgesTable" as e
+        JOIN "Nodes" as n ON n.id = e.id_src
         
         WHERE (n.longitude BETWEEN {bbox[0]} AND {bbox[2]})
         AND (n.latitude BETWEEN {bbox[1]} AND {bbox[3]});
