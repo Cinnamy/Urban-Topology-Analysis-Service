@@ -264,7 +264,6 @@ def add_graph_to_db(city_id: int, file_path: str, city_name: str) -> None:
         # Вставка в Edges дорог с пометкой oneway
         query = text(
             """INSERT INTO "Edges" (id_way, id_src, id_dist)
-                SELECT
                 wn.way_id,
                 wn.node_id,
                 wn2.node_id
@@ -329,13 +328,10 @@ def add_graph_to_db(city_id: int, file_path: str, city_name: str) -> None:
                 """
         )
         res = conn.execute(query)
-
         add_stops_and_routes_to_db(city_id=city_id, file_path=file_path)
-
         query = update(CityAsync).where(CityAsync.c.id ==
                                         f"{city_id}").values(downloaded=True)
         conn.execute(query)
-
         conn.close()
     except Exception as ex:
         print(ex)
@@ -1132,7 +1128,6 @@ async def stops_graph_from_poly(city_id, polygon):
         SELECT e.id, e.id_src, e.id_dest, e.id_route
         FROM "EdgesTable" as e
         JOIN "Nodes" as n ON n.id = e.id_src
-
         WHERE (n.longitude BETWEEN {bbox[0]} AND {bbox[2]})
         AND (n.latitude BETWEEN {bbox[1]} AND {bbox[3]});
         """
