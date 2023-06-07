@@ -199,7 +199,7 @@ def add_graph_to_db(city_id: int, file_path: str, city_name: str) -> None:
         query = text(
             """INSERT INTO "Points" ("id", "longitude", "latitude")
                 SELECT DISTINCT n.id,
-                ST_X(n.geom) AS longitude, 
+                ST_X(n.geom) AS longitude,
                 ST_Y(n.geom) AS latitude
                 FROM nodes n
                 JOIN way_nodes wn ON wn.node_id = n.id
@@ -264,14 +264,13 @@ def add_graph_to_db(city_id: int, file_path: str, city_name: str) -> None:
         # Вставка в Edges дорог с пометкой oneway
         query = text(
             """INSERT INTO "Edges" (id_way, id_src, id_dist)
-                SELECT 
                 wn.way_id,
                 wn.node_id,
                 wn2.node_id
                 FROM "Ways" w
-                JOIN way_nodes wn ON wn.way_id = w.id 
-                JOIN way_tags wt ON wt.way_id = wn.way_id 
-                JOIN way_nodes wn2 ON wn2.way_id = wn.way_id 
+                JOIN way_nodes wn ON wn.way_id = w.id
+                JOIN way_tags wt ON wt.way_id = wn.way_id
+                JOIN way_nodes wn2 ON wn2.way_id = wn.way_id
                 WHERE wt.k like 'oneway'
                 AND wt.v like 'yes'
                 AND wn.sequence_id + 1 = wn2.sequence_id
@@ -286,18 +285,18 @@ def add_graph_to_db(city_id: int, file_path: str, city_name: str) -> None:
                 SELECT
                     w.id
                 FROM ways w
-                JOIN way_tags wt ON wt.way_id = w.id 
+                JOIN way_tags wt ON wt.way_id = w.id
                 WHERE (wt.k like 'oneway'
                 AND wt.v like 'yes')
                 )
                 INSERT INTO "Edges" (id_way, id_src, id_dist)
-                SELECT 
+                SELECT
                 wn.way_id,
                 wn.node_id,
                 wn2.node_id
                 FROM "Ways" w
                 JOIN way_nodes wn ON wn.way_id = w.id
-                JOIN way_nodes wn2 ON wn2.way_id = wn.way_id 
+                JOIN way_nodes wn2 ON wn2.way_id = wn.way_id
                 WHERE w.id NOT IN (SELECT id FROM oneway_way_id)
                 AND wn.sequence_id + 1 = wn2.sequence_id
                 ORDER BY wn.sequence_id;
@@ -311,31 +310,28 @@ def add_graph_to_db(city_id: int, file_path: str, city_name: str) -> None:
                 SELECT
                     w.id
                 FROM ways w
-                JOIN way_tags wt ON wt.way_id = w.id 
+                JOIN way_tags wt ON wt.way_id = w.id
                 WHERE (wt.k like 'oneway'
                 AND wt.v like 'yes')
                 )
                 INSERT INTO "Edges" (id_way, id_src, id_dist)
-                SELECT 
+                SELECT
                 wn.way_id,
                 wn2.node_id,
                 wn.node_id
                 FROM "Ways" w
                 JOIN way_nodes wn ON wn.way_id = w.id
-                JOIN way_nodes wn2 ON wn2.way_id = wn.way_id 
+                JOIN way_nodes wn2 ON wn2.way_id = wn.way_id
                 WHERE w.id NOT IN (SELECT id FROM oneway_way_id)
                 AND wn.sequence_id + 1 = wn2.sequence_id
                 ORDER BY wn2.sequence_id DESC;
                 """
         )
         res = conn.execute(query)
-
         add_stops_and_routes_to_db(city_id=city_id, file_path=file_path)
-
         query = update(CityAsync).where(CityAsync.c.id ==
                                         f"{city_id}").values(downloaded=True)
         conn.execute(query)
-
         conn.close()
     except Exception as ex:
         print(ex)
@@ -570,10 +566,10 @@ async def graph_from_poly(city_id, polygon):
     if city is None or not city.downloaded:
         return None, None, None, None
     query = text(
-        f"""SELECT p.id, p.longitude, p.latitude 
+        f"""SELECT p.id, p.longitude, p.latitude
         FROM "Points" p
-        JOIN "Edges" e ON e.id_src = p.id 
-        JOIN "Ways" w ON e.id_way = w.id 
+        JOIN "Edges" e ON e.id_src = p.id
+        JOIN "Ways" w ON e.id_way = w.id
         WHERE w.id_city = {city_id}
         AND (p.longitude BETWEEN {bbox[0]} AND {bbox[2]})
         AND (p.latitude BETWEEN {bbox[1]} AND {bbox[3]});
@@ -603,10 +599,10 @@ async def graph_from_poly(city_id, polygon):
     query = text(
         f"""WITH named_streets AS (
             SELECT e.id AS id, e.id_way AS id_way, e.id_src AS id_src, e.id_dist AS id_dist, wp.value AS value
-            FROM "Edges" e 
-            JOIN "WayProperties" wp ON wp.id_way = e.id_way 
-            JOIN "Ways" w ON w.id = e.id_way 
-            JOIN "Points" p ON p.id = e.id_src 
+            FROM "Edges" e
+            JOIN "WayProperties" wp ON wp.id_way = e.id_way
+            JOIN "Ways" w ON w.id = e.id_way
+            JOIN "Points" p ON p.id = e.id_src
             WHERE wp.id_property = {prop_id_name}
             AND w.id_city = {city_id}
             AND (p.longitude BETWEEN {bbox[0]} AND {bbox[2]})
@@ -614,10 +610,10 @@ async def graph_from_poly(city_id, polygon):
         ),
         unnamed_streets AS (
             SELECT e.id AS id, e.id_way AS id_way, e.id_src AS id_src, e.id_dist AS id_dist, wp.value AS value
-            FROM "Edges" e 
-            JOIN "WayProperties" wp ON wp.id_way = e.id_way 
-            JOIN "Ways" w ON w.id = e.id_way 
-            JOIN "Points" p ON p.id = e.id_src 
+            FROM "Edges" e
+            JOIN "WayProperties" wp ON wp.id_way = e.id_way
+            JOIN "Ways" w ON w.id = e.id_way
+            JOIN "Points" p ON p.id = e.id_src
             WHERE e.id_way NOT IN (
                 SELECT id_way
                 FROM named_streets
@@ -654,8 +650,8 @@ async def graph_from_poly(city_id, polygon):
 
     ids_ways = build_in_query('id_way', ways_prop_ids)
     query = text(
-        f"""SELECT id_way, property, value FROM 
-        (SELECT id_way, id_property, value FROM "WayProperties" WHERE {ids_ways}) AS p 
+        f"""SELECT id_way, property, value FROM
+        (SELECT id_way, id_property, value FROM "WayProperties" WHERE {ids_ways}) AS p
         JOIN "Properties" ON p.id_property = "Properties".id;
         """)
 
@@ -664,8 +660,8 @@ async def graph_from_poly(city_id, polygon):
 
     ids_points = build_in_query('id_point', points_prop_ids)
     query = text(
-        f"""SELECT id_point, property, value FROM 
-        (SELECT id_point, id_property, value FROM "PointProperties" WHERE {ids_points}) AS p 
+        f"""SELECT id_point, property, value FROM
+        (SELECT id_point, id_property, value FROM "PointProperties" WHERE {ids_points}) AS p
         JOIN "Properties" ON p.id_property = "Properties".id;
         """)
 
@@ -858,7 +854,7 @@ def get_reversed_graph(graph: DataFrame, way_column: str):
     query = text(
         f"""WITH way_names AS
         (
-            SELECT 
+            SELECT
                 wp.id_way,
                 wp.value AS name
             FROM "WayProperties" wp
@@ -867,14 +863,14 @@ def get_reversed_graph(graph: DataFrame, way_column: str):
         )
         , city_way_names AS
         (
-            SELECT 
+            SELECT
                 w.id,
                 wn.name
             FROM "Ways" w
                 LEFT JOIN way_names wn ON w.id = wn.id_way
             WHERE {in_query_way_ids}
         )
-        SELECT 
+        SELECT
             e1.id_dist AS crossroad,
             wn1.name AS street_name1,
             wn1.id AS id_way1,
@@ -1116,7 +1112,7 @@ async def stops_graph_from_poly(city_id, polygon):
     query = text(
         f"""SELECT n.id, n.longitude, n.latitude
         FROM "Nodes" n
-        JOIN "Stops" s ON s.id_node = n.id 
+        JOIN "Stops" s ON s.id_node = n.id
         JOIN "RoutesTable" r ON s.id_route = r.id
         WHERE r.id_city = {city_id}
         AND (n.longitude BETWEEN {bbox[0]} AND {bbox[2]})
@@ -1132,7 +1128,6 @@ async def stops_graph_from_poly(city_id, polygon):
         SELECT e.id, e.id_src, e.id_dest, e.id_route
         FROM "EdgesTable" as e
         JOIN "Nodes" as n ON n.id = e.id_src
-        
         WHERE (n.longitude BETWEEN {bbox[0]} AND {bbox[2]})
         AND (n.latitude BETWEEN {bbox[1]} AND {bbox[3]});
         """
@@ -1148,8 +1143,8 @@ async def stops_graph_from_poly(city_id, polygon):
 
     query = text(
         f"""
-        SELECT id_point, property, value FROM 
-        (SELECT id_point, id_property, value FROM "NodesProperty" WHERE {ids_points}) AS p 
+        SELECT id_point, property, value FROM
+        (SELECT id_point, id_property, value FROM "NodesProperty" WHERE {ids_points}) AS p
         JOIN "NodesPropertyTable" ON p.id_property = "NodesPropertyTable".id;
         """
     )

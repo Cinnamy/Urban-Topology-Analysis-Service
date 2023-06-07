@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Query
 from uvicorn import run
 from os import getenv
-from schemas import CityBase, RegionBase, GraphBase, StopsBase
+from schemas import CityBase, RegionBase, GraphBase, StopsBase, RouteBase
 from database import database, engine, metadata
 
 import pandas as pd
@@ -138,6 +138,11 @@ async def city_graph_poly(
     return services.graph_to_scheme(points, edges, pprop, wprop)
 
 
+# --------------------------------------------------------------------------
+# stops
+# --------------------------------------------------------------------------
+
+
 @app.post('/api/city_v2/stops/region/', response_model=StopsBase)
 @logger.catch(exclude=HTTPException)
 async def stops_graph(
@@ -183,7 +188,56 @@ async def stops_graph_poly(
     logger.info(f"{request} {status_code} {detail}")
     return services.get_stops_answer(stops, edges, stops_prop)
 
+
+# --------------------------------------------------------------------------
+# routes
+# --------------------------------------------------------------------------
+
+
+@app.post('/api/city_v3/routes/region/', response_model=RouteBase)
+@logger.catch(exclude=HTTPException)
+async def routes_graph(
+    city_id: int,
+    regions_ids: List[int],
+):
+    request = f"GET /api/cities/routes/?city_id={city_id}&regions={regions_ids}"
+    status_code = 200
+    detail = "OK"
+
+    routes, routes_edges, routes_prop  = await services.routes_graph_from_ids(city_id=city_id, regions_ids=regions_ids, regions=regions_df)
     
+    if routes is None:
+        status_code = 404
+        detail = "NOT FOUND"
+        logger.error(f"{request} {status_code} {detail}")
+        raise HTTPException(status_code=status_code, detail=detail)
+
+    logger.info(f"{request} {status_code} {detail}")
+    return services.get_routes_answer(routes, routes_edges, routes_prop)
+
+
+@app.post('/api/city_v3/routes/bbox/{city_id}/', response_model=RouteBase)
+@logger.catch(exclude=HTTPException)
+async def routes_graph_poly(
+    city_id: int,
+    polygons_as_list:  List[List[List[float]]]
+):
+    request = f"POST /api/city_v3/routes/bbox/{city_id}/"
+    status_code = 200
+    detail = "OK"
+
+    polygon = services.list_to_polygon(polygons=polygons_as_list)
+    
+    routes, routes_edges, routes_prop = await services.routes_graph_from_poly(city_id=city_id, polygon=polygon)
+
+    if routes is None:
+        status_code = 404
+        detail = "NOT FOUND"
+        logger.error(f"{request} {status_code} {detail}")
+        raise HTTPException(status_code=status_code, detail=detail)
+
+    logger.info(f"{request} {status_code} {detail}")
+    return services.get_routes_answer(routes, routes_edges, routes_prop)
 
 # Useless:
 
