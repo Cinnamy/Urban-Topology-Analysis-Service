@@ -535,7 +535,6 @@ def record_obj_to_pprop(record):
 def point_obj_to_list(db_record):
     return [db_record.id, db_record.longitude, db_record.latitude]
 
-
 def stops_edge_obj_to_list(db_record):
     return [db_record.id, db_record.id_route, db_record.id_src, db_record.id_dest]
 
