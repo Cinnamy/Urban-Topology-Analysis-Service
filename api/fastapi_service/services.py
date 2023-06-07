@@ -497,21 +497,21 @@ def polygons_from_region(regions_ids : List[int], regions : GeoDataFrame):
     polygons = regions[regions['osm_id'].isin(regions_ids)]
     return unary_union([geom for geom in polygons['geometry'].values])
 
-async def graph_from_ids(city_id : int, regions_ids : List[int], regions : GeoDataFrame):
+async def graph_from_ids(city_id: int, regions_ids: List[int], regions: GeoDataFrame):
     polygon = polygons_from_region(regions_ids=regions_ids, regions=regions)
     if polygon == None:
         return None, None, None, None
     return await graph_from_poly(city_id=city_id, polygon=polygon)
 
 
-async def stops_graph_from_ids(city_id : int, regions_ids : List[int], regions : GeoDataFrame):
+async def stops_graph_from_ids(city_id: int, regions_ids: List[int], regions: GeoDataFrame):
     polygon = polygons_from_region(regions_ids=regions_ids, regions=regions)
     if polygon == None:
         return None, None, None
     return await stops_graph_from_poly(city_id=city_id, polygon=polygon)
 
 
-async def routes_graph_from_ids(city_id : int, regions_ids : List[int], regions : GeoDataFrame):
+async def routes_graph_from_ids(city_id: int, regions_ids: List[int], regions: GeoDataFrame):
     polygon = polygons_from_region(regions_ids=regions_ids, regions=regions)
     if polygon == None:
         return None, None, None
