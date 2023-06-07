@@ -43,7 +43,7 @@ namespace Test
             check.Click();
             stopwatch.Stop();
             Console.WriteLine("The construction of the graph took: {0} s", stopwatch.ElapsedMilliseconds / 1000);
-            IWebElement button2 = driver.FindElement(By.XPath("/html/body/town-finder/div/app-town/div/div[5]/button[2]"));
+            IWebElement button2 = driver.FindElement(By.XPath("/html/body/town-finder/div/app-town/div/div[5]/button[4]"));
             button2.Click();
             IWebElement down = (new WebDriverWait(driver, new TimeSpan(0, 0, 30))).Until(SeleniumExtras.WaitHelpers.ExpectedConditions.ElementIsVisible(By.XPath("/html/body/town-finder/div/app-town/div/div[2]/app-graph/div/div[2]/div[1]/h2")));
             Actions act1 = new Actions(driver);
